@@ -12,6 +12,12 @@ data/*.pdf
 # Notas de trabajo internas (no parte del entregable publico)
 capstone_costa_del_sol.md
 
+# Capturas pegadas en el chat con Claude y carpeta que genera la app de
+# escritorio - no son parte del repo. La barra inicial ancla a la raiz, asi
+# que no afecta a images/headline.png (esa si va al repo).
+/image*.png
+/Claude outputs/
+
 # Jupyter / Python
 .ipynb_checkpoints/
 __pycache__/

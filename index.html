@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="es">
+<html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Costa del Sol — Riesgo de Inundación</title>
+<title>Costa del Sol — Flood Risk</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/maplibre-gl@3.6.2/dist/maplibre-gl.css">
 <script src="https://cdn.jsdelivr.net/npm/maplibre-gl@3.6.2/dist/maplibre-gl.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/pmtiles@3.0.7/dist/pmtiles.js"></script>
@@ -155,8 +155,11 @@
 
   #detail-legend {
     position: absolute;
-    bottom: 28px;
-    left: 12px;
+    /* A la derecha, encima del control de escala/atribucion (ambos en
+       bottom-right) - a la izquierda se solapaba con la leyenda del panel
+       cuando este crecia (ej. con el popup de municipio abierto al lado). */
+    bottom: 80px;
+    right: 12px;
     background: var(--surface-1);
     border: 1px solid var(--border-hairline);
     border-radius: 10px;
@@ -213,35 +216,43 @@
 <div id="panel">
   <div id="panel-header">
     <div>
-      <h1>Costa del Sol — Riesgo de inundación</h1>
-      <p class="subtitle">Tarifa–Nerja + valle del Guadalhorce · 62 municipios</p>
+      <h1>Costa del Sol — Flood Risk</h1>
+      <p class="subtitle">Tarifa–Nerja + inland Guadalhorce valley · 62 municipalities</p>
     </div>
-    <button id="panel-toggle" aria-label="Mostrar/ocultar panel">▾</button>
+    <button id="panel-toggle" aria-label="Show/hide panel">▾</button>
   </div>
 
   <div class="control-group">
-    <span class="control-label">Carril de exposición</span>
+    <span class="control-label">Base map</span>
+    <div class="seg" id="basemap-toggle">
+      <button data-basemap="osm" class="active">Street</button>
+      <button data-basemap="satellite">Satellite</button>
+    </div>
+  </div>
+
+  <div class="control-group">
+    <span class="control-label">Exposure channel</span>
     <div class="seg" id="carril-toggle">
-      <button data-carril="urbano" class="active">Urbano (€)</button>
-      <button data-carril="agricola">Agrícola (ha)</button>
+      <button data-carril="urbano" class="active">Urban (€)</button>
+      <button data-carril="agricola">Agricultural (ha)</button>
     </div>
   </div>
 
   <div class="control-group">
-    <span class="control-label">Periodo de retorno</span>
+    <span class="control-label">Return period</span>
     <select id="periodo">
-      <option value="t10">T10 (frecuente)</option>
+      <option value="t10">T10 (frequent)</option>
       <option value="t50">T50</option>
-      <option value="t100" selected>T100 (referencia)</option>
-      <option value="t500">T500 (extremo)</option>
-      <option value="ead">EAD anualizado</option>
+      <option value="t100" selected>T100 (reference)</option>
+      <option value="t500">T500 (extreme)</option>
+      <option value="ead">Annualized EAD</option>
     </select>
   </div>
 
   <hr class="sep">
 
   <div class="control-group">
-    <span class="control-label" id="legend-title">Leyenda</span>
+    <span class="control-label" id="legend-title">Legend</span>
     <div id="legend"></div>
     <div class="legend-note" id="legend-note"></div>
   </div>
@@ -249,18 +260,20 @@
   <hr class="sep">
 
   <div class="control-group">
-    <span class="control-label">Capas</span>
-    <label class="toggle-row"><input type="checkbox" id="toggle-snczi" checked> Zona inundable SNCZI</label>
-    <label class="toggle-row"><input type="checkbox" id="toggle-cauces" checked> Cauces (zoom ≥ 12)</label>
-    <label class="toggle-row"><input type="checkbox" id="toggle-comarcas" checked> Límite de comarca</label>
+    <span class="control-label">Layers</span>
+    <label class="toggle-row"><input type="checkbox" id="toggle-snczi" checked> SNCZI flood zone</label>
+    <label class="toggle-row"><input type="checkbox" id="toggle-cauces" checked> Watercourses (zoom ≥ 12)</label>
+    <label class="toggle-row"><input type="checkbox" id="toggle-comarcas" checked> Comarca boundary</label>
+    <label class="toggle-row"><input type="checkbox" id="toggle-grid-highlight" checked> Municipalities with detail grid</label>
   </div>
 </div>
 
 <div id="detail-legend">
-  <div class="title">Zoom ≥ 13 — cota relativa al cauce, por edificio o píxel de cultivo individual (no es un agregado municipal)</div>
-  <div class="legend-row"><span class="swatch" style="background:var(--diverging-below)"></span> Por debajo del cauce (&lt; -1 m)</div>
-  <div class="legend-row"><span class="swatch" style="background:var(--diverging-mid)"></span> A nivel del cauce (-1 a +1 m)</div>
-  <div class="legend-row"><span class="swatch" style="background:var(--diverging-above)"></span> Por encima del cauce (&gt; +1 m)</div>
+  <div class="title">Zoom ≥ 12.5 — elevation relative to channel, per individual building or crop pixel (not a municipality aggregate)</div>
+  <div class="legend-row"><span class="swatch" style="background:var(--diverging-below)"></span> Below channel level (&lt; -1 m)</div>
+  <div class="legend-row"><span class="swatch" style="background:var(--diverging-mid)"></span> At channel level (-1 to +1 m)</div>
+  <div class="legend-row"><span class="swatch" style="background:var(--diverging-above)"></span> Above channel level (&gt; +1 m)</div>
+  <div class="legend-note">Only available in the 10 municipalities marked on the map with a dashed orange outline: Fuengirola, Málaga, Marbella, Rincón de la Victoria, Vélez-Málaga, Torremolinos, San Roque, Cártama, Nerja and Mijas — selection criteria explained in the README.</div>
 </div>
 
 <script>
@@ -308,22 +321,31 @@ function propName(carril, periodo) {
 }
 
 function fmtEur(v) {
-  if (v == null) return "sin dato";
-  if (v >= 1e9) return (v / 1e9).toFixed(2).replace(".", ",") + " mil M€";
-  if (v >= 1e6) return (v / 1e6).toFixed(1).replace(".", ",") + " M€";
-  return Math.round(v).toLocaleString("es-ES") + " €";
+  if (v == null) return "no data";
+  if (v >= 1e9) return "€" + (v / 1e9).toFixed(2) + "B";
+  if (v >= 1e6) return "€" + (v / 1e6).toFixed(1) + "M";
+  return "€" + Math.round(v).toLocaleString("en-US");
 }
 function fmtHa(v) {
-  if (v == null) return "sin dato";
-  return v.toLocaleString("es-ES", { maximumFractionDigits: 1 }) + " ha";
+  if (v == null) return "no data";
+  return v.toLocaleString("en-US", { maximumFractionDigits: 1 }) + " ha";
 }
 function fmtM(v) {
-  if (v == null || Number.isNaN(v)) return "sin dato";
+  if (v == null || Number.isNaN(v)) return "no data";
   return (v >= 0 ? "+" : "") + v.toFixed(2) + " m";
 }
 function fmtPct(v) {
-  if (v == null) return "sin dato";
-  return v.toFixed(1).replace(".", ",") + " %";
+  if (v == null) return "no data";
+  return v.toFixed(1) + "%";
+}
+function toTitleCase(s) {
+  if (!s) return s;
+  const lower = new Set(["de", "del", "la", "el", "o", "y"]);
+  return s
+    .toLowerCase()
+    .split(" ")
+    .map((w, i) => (i > 0 && lower.has(w) ? w : w.charAt(0).toUpperCase() + w.slice(1)))
+    .join(" ");
 }
 
 function fillColorExpression(prop, breaks) {
@@ -343,12 +365,12 @@ function renderLegend() {
   const prop = propName(state.carril, state.periodo);
   const breaks = BREAKS[prop];
   const fmt = state.carril === "urbano" ? fmtEur : fmtHa;
-  const zeroLabel = state.carril === "urbano" ? "Sin dato / sin exposición" : "Sin superficie inundada";
+  const zeroLabel = state.carril === "urbano" ? "No data / no exposure" : "No flooded area";
 
   const legendTitle = document.getElementById("legend-title");
   legendTitle.textContent = state.carril === "urbano"
-    ? "Valor construido en riesgo, por municipio"
-    : "Superficie agrícola en riesgo, por municipio";
+    ? "Built-up value at risk, by municipality"
+    : "Agricultural area at risk, by municipality";
 
   const rows = [
     [NEUTRAL, zeroLabel],
@@ -365,8 +387,8 @@ function renderLegend() {
 
   const note = document.getElementById("legend-note");
   note.textContent = state.carril === "urbano"
-    ? "Clases por cuantiles (25/50/75) sobre los 12 municipios con dato de €/m² disponible."
-    : "Clases por cuantiles (25/50/75) sobre los 34 municipios con superficie agrícola inundada.";
+    ? "Classes by quantiles (25/50/75) over the 12 municipalities with €/m² data available."
+    : "Classes by quantiles (25/50/75) over the 34 municipalities with flooded agricultural area.";
 }
 
 function updateChoropleth(map) {
@@ -391,50 +413,51 @@ const COTA_RELATIVA_COLOR = [
 
 function buildMunicipioPopupHTML(p) {
   return `
-    <div class="popup-title">${p.Mun_Name} <span style="font-weight:400;color:var(--text-muted);font-size:11px;">(total municipio)</span></div>
+    <div class="popup-title">${p.Mun_Name} <span style="font-weight:400;color:var(--text-muted);font-size:11px;">(municipality total)</span></div>
+    <div style="color:var(--text-secondary);font-size:11.5px;margin:-4px 0 8px;">${toTitleCase(p.Comarca_Name) ?? "no data"} · ${p.Prov_Name ?? "no data"}</div>
     <div class="popup-section">
-      <div class="popup-section-title">Carril urbano</div>
+      <div class="popup-section-title">Urban channel</div>
       <div class="popup-row"><span class="k">T10</span><span class="v">${fmtEur(p.eur_urbano_t10)}</span></div>
       <div class="popup-row"><span class="k">T50</span><span class="v">${fmtEur(p.eur_urbano_t50)}</span></div>
       <div class="popup-row"><span class="k">T100</span><span class="v">${fmtEur(p.eur_urbano_t100)}</span></div>
       <div class="popup-row"><span class="k">T500</span><span class="v">${fmtEur(p.eur_urbano_t500)}</span></div>
-      <div class="popup-row"><span class="k">EAD anualizado</span><span class="v">${fmtEur(p.ead_eur_urbano)}</span></div>
-      <div class="popup-row"><span class="k">Edificios inundados T100</span><span class="v">${p.n_edificios_inundados_t100 ?? "sin dato"} (${fmtPct(p.pct_edificios_inundados_t100)})</span></div>
+      <div class="popup-row"><span class="k">Annualized EAD</span><span class="v">${fmtEur(p.ead_eur_urbano)}</span></div>
+      <div class="popup-row"><span class="k">Flooded buildings T100</span><span class="v">${p.n_edificios_inundados_t100 ?? "no data"} (${fmtPct(p.pct_edificios_inundados_t100)})</span></div>
     </div>
     <div class="popup-section">
-      <div class="popup-section-title">Carril agrícola</div>
+      <div class="popup-section-title">Agricultural channel</div>
       <div class="popup-row"><span class="k">T10</span><span class="v">${fmtHa(p.ha_agricola_t10)}</span></div>
       <div class="popup-row"><span class="k">T50</span><span class="v">${fmtHa(p.ha_agricola_t50)}</span></div>
       <div class="popup-row"><span class="k">T100</span><span class="v">${fmtHa(p.ha_agricola_t100)}</span></div>
       <div class="popup-row"><span class="k">T500</span><span class="v">${fmtHa(p.ha_agricola_t500)}</span></div>
-      <div class="popup-row"><span class="k">EAD anualizado</span><span class="v">${fmtHa(p.ead_ha_agricola)}</span></div>
-      <div class="popup-row"><span class="k">Cultivo dominante (T100)</span><span class="v">${p.cultivo_principal_t100 ?? "sin dato"}</span></div>
+      <div class="popup-row"><span class="k">Annualized EAD</span><span class="v">${fmtHa(p.ead_ha_agricola)}</span></div>
+      <div class="popup-row"><span class="k">Dominant crop (T100)</span><span class="v">${p.cultivo_principal_t100 ?? "no data"}</span></div>
     </div>
     <div class="popup-section">
-      <div class="popup-section-title">Daño histórico (CNIH)</div>
-      <div class="popup-row"><span class="k">Eventos registrados</span><span class="v">${p.n_eventos ?? "sin dato"}</span></div>
-      <div class="popup-row"><span class="k">Indemnización total</span><span class="v">${fmtEur(p.indemnizacion_total_eur)}</span></div>
+      <div class="popup-section-title">Historic damage (CNIH)</div>
+      <div class="popup-row"><span class="k">Recorded events</span><span class="v">${p.n_eventos ?? "no data"}</span></div>
+      <div class="popup-row"><span class="k">Total compensation</span><span class="v">${fmtEur(p.indemnizacion_total_eur)}</span></div>
     </div>
-    ${p.is_grid ? '<div class="popup-note">Este municipio tiene grid de detalle (zoom ≥ 13) - edificios y cultivos a nivel de punto.</div>' : ""}
+    ${p.is_grid ? '<div class="popup-note">This municipality has a detail grid (zoom ≥ 12.5) - individual buildings and crop pixels.</div>' : ""}
   `;
 }
 
 function buildEdificioPopupHTML(p) {
   return `
-    <div class="popup-title">Edificio individual (T100)</div>
-    <div class="popup-row"><span class="k">Cota relativa al cauce</span><span class="v">${fmtM(p.cota_relativa_m)}</span></div>
-    <div class="popup-row"><span class="k">Cota edificio</span><span class="v">${p.cota_edificio_m?.toFixed(2) ?? "sin dato"} m</span></div>
-    <div class="popup-row"><span class="k">Cota cauce</span><span class="v">${p.cota_cauce_m?.toFixed(2) ?? "sin dato"} m</span></div>
-    <div class="popup-note">Distancia al cauce: usa la escala del mapa (abajo a la derecha) para medirla a ojo si la necesitas.</div>
+    <div class="popup-title">Individual building (T100)</div>
+    <div class="popup-row"><span class="k">Elevation relative to channel</span><span class="v">${fmtM(p.cota_relativa_m)}</span></div>
+    <div class="popup-row"><span class="k">Building elevation</span><span class="v">${p.cota_edificio_m?.toFixed(2) ?? "no data"} m</span></div>
+    <div class="popup-row"><span class="k">Channel elevation</span><span class="v">${p.cota_cauce_m?.toFixed(2) ?? "no data"} m</span></div>
+    <div class="popup-note">Distance to channel: use the map's scale bar (bottom-right) to estimate it visually if you need it.</div>
   `;
 }
 
 function buildAgricolaPopupHTML(p) {
   return `
-    <div class="popup-title">Píxel de cultivo individual (T100)</div>
-    <div class="popup-row"><span class="k">Tipo de cultivo</span><span class="v">${p.cultivo ?? "sin dato"}</span></div>
-    <div class="popup-row"><span class="k">Cota relativa al cauce</span><span class="v">${fmtM(p.cota_relativa_m)}</span></div>
-    <div class="popup-note">Distancia al cauce: usa la escala del mapa (abajo a la derecha) para medirla a ojo si la necesitas.</div>
+    <div class="popup-title">Individual crop pixel (T100)</div>
+    <div class="popup-row"><span class="k">Crop type</span><span class="v">${p.cultivo ?? "no data"}</span></div>
+    <div class="popup-row"><span class="k">Elevation relative to channel</span><span class="v">${fmtM(p.cota_relativa_m)}</span></div>
+    <div class="popup-note">Distance to channel: use the map's scale bar (bottom-right) to estimate it visually if you need it.</div>
   `;
 }
 
@@ -455,39 +478,85 @@ const map = new maplibregl.Map({
         tileSize: 256,
         attribution: "© OpenStreetMap contributors",
       },
+      satellite: {
+        type: "raster",
+        tiles: ["https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"],
+        tileSize: 256,
+        attribution: "Esri, Maxar, Earthstar Geographics",
+      },
       cds: {
         type: "vector",
         url: `pmtiles://${PMTILES_URL}`,
+      },
+      // Misma fuente, pero con maxzoom:14 declarado explicitamente. Mas alla
+      // de z14, MapLibre no pide un tile nuevo - hace "overzoom" automatico,
+      // reutilizando y escalando el ultimo tile real (z14) en vez de mostrar
+      // nada. Asi el municipio de fondo y la zona SNCZI se quedan visibles
+      // junto al grid de detalle (12.5-16) sin tener que retilear esas capas
+      // (que son poligonos grandes y engordarian mucho el pmtiles - ver
+      // convert.sh). Los layers de puntos (edificios/agricola) usan la fuente
+      // "cds" normal, que si tiene datos reales tileados hasta z16.
+      cds_bg: {
+        type: "vector",
+        url: `pmtiles://${PMTILES_URL}`,
+        maxzoom: 14,
       },
     },
     layers: [
       { id: "background", type: "background", paint: { "background-color": "#f9f9f7" } },
       { id: "osm-base", type: "raster", source: "osm", paint: { "raster-opacity": 0.55 } },
+      // Satelite oculto por defecto - se activa desde el selector "Mapa base"
+      // del panel. Opacidad 1: a diferencia del OSM (que se atenua para no
+      // competir con el choropleth), aqui el punto es ver los edificios reales.
+      { id: "satellite-base", type: "raster", source: "satellite", layout: { visibility: "none" }, paint: { "raster-opacity": 1 } },
 
-      { id: "snczi-fill", type: "fill", source: "cds", "source-layer": "snczi_zonas",
-        minzoom: 0, maxzoom: 14,
+      // Capas de contexto (SNCZI, municipio, comarca, cauces): fuente
+      // "cds_bg" (maxzoom:14, overzoom automatico - ver comentario junto a
+      // la fuente) para que sigan visibles hasta z18 junto al grid de
+      // detalle, sin re-tilear estos poligonos grandes.
+      { id: "snczi-fill", type: "fill", source: "cds_bg", "source-layer": "snczi_zonas",
+        minzoom: 0, maxzoom: 18,
         paint: { "fill-color": "#6da7ec", "fill-opacity": 0.35 } },
-      { id: "snczi-outline", type: "line", source: "cds", "source-layer": "snczi_zonas",
-        minzoom: 0, maxzoom: 14,
+      { id: "snczi-outline", type: "line", source: "cds_bg", "source-layer": "snczi_zonas",
+        minzoom: 0, maxzoom: 18,
         paint: { "line-color": "#256abf", "line-width": 0.6, "line-opacity": 0.6 } },
 
-      { id: "municipios-fill", type: "fill", source: "cds", "source-layer": "municipios",
-        minzoom: 0, maxzoom: 14,
+      // Vuelve a desaparecer en z14, como estaba originalmente - Juan lo
+      // confirmo asi ("eso estaba bien no lo tenias que tocar"). Solo las
+      // zonas SNCZI (arriba) se quedan visibles mas alla de z14.
+      { id: "municipios-fill", type: "fill", source: "cds_bg", "source-layer": "municipios",
+        minzoom: 0, maxzoom: 13,
         paint: { "fill-color": NEUTRAL, "fill-opacity": 0.75 } },
-      { id: "municipios-outline", type: "line", source: "cds", "source-layer": "municipios",
-        minzoom: 0, maxzoom: 14,
+      { id: "municipios-outline", type: "line", source: "cds_bg", "source-layer": "municipios",
+        minzoom: 0, maxzoom: 13,
         paint: { "line-color": "#52514e", "line-width": 0.5, "line-opacity": 0.5 } },
 
-      { id: "comarcas-line", type: "line", source: "cds", "source-layer": "limites_comarcas",
-        minzoom: 0, maxzoom: 14,
+      // Resalta los municipios con grid de detalle (edificios/cultivo a
+      // nivel de punto) directamente en el choropleth, sin necesidad de
+      // clicar - para que no se busque el detalle donde no esta disponible.
+      // Mismo maxzoom 13 que el choropleth, ya que es parte del mismo.
+      { id: "municipios-grid-highlight", type: "line", source: "cds_bg", "source-layer": "municipios",
+        minzoom: 0, maxzoom: 13,
+        filter: ["==", ["get", "is_grid"], true],
+        paint: { "line-color": "#eb6834", "line-width": 2, "line-dasharray": [2, 1.2], "line-opacity": 0.9 } },
+
+      { id: "comarcas-line", type: "line", source: "cds_bg", "source-layer": "limites_comarcas",
+        minzoom: 0, maxzoom: 18,
         paint: { "line-color": "#0b0b0b", "line-width": 2.2, "line-opacity": 0.9 } },
 
-      { id: "cauces-fill", type: "fill", source: "cds", "source-layer": "hidrografia_cauces",
-        minzoom: 12, maxzoom: 14,
+      { id: "cauces-fill", type: "fill", source: "cds_bg", "source-layer": "hidrografia_cauces",
+        minzoom: 12, maxzoom: 18,
         paint: { "fill-color": "#184f95", "fill-opacity": 0.55 } },
 
       { id: "agricola-grid-circle", type: "circle", source: "cds", "source-layer": "agricola_grid_t100",
-        minzoom: 13, maxzoom: 16,
+        // minzoom fraccional a proposito: el tile ya trae datos desde z12
+        // (ver convert.sh), pero el layer solo empieza a pintarlos a partir
+        // de 12.5 - medio nivel de zoom antes de lo que habia (13), como
+        // pidio Juan, sin tener que retilear a un entero mas bajo todavia.
+        // maxzoom 18 (no 16): el tile real solo llega a z16 (convert.sh),
+        // pero mas alla de z16 MapLibre hace overzoom automatico del mismo
+        // tile - los puntos siguen ahi, clicables, hasta el maxZoom del mapa.
+        minzoom: 12.5, maxzoom: 18,
         paint: {
           "circle-radius": 2.5,
           "circle-color": COTA_RELATIVA_COLOR,
@@ -495,7 +564,10 @@ const map = new maplibregl.Map({
         } },
 
       { id: "edificios-grid-circle", type: "circle", source: "cds", "source-layer": "edificios_grid_t100",
-        minzoom: 13, maxzoom: 16,
+        // Igual que agricola-grid-circle: maxzoom 18 para que se puedan
+        // seguir seleccionando edificios en el zoom mas alto (overzoom del
+        // tile z16, mismo mecanismo que el resto de capas de contexto).
+        minzoom: 12.5, maxzoom: 18,
         paint: {
           "circle-radius": 4,
           "circle-color": COTA_RELATIVA_COLOR,
@@ -561,6 +633,18 @@ document.getElementById("toggle-cauces").addEventListener("change", (e) => {
 });
 document.getElementById("toggle-comarcas").addEventListener("change", (e) => {
   map.setLayoutProperty("comarcas-line", "visibility", e.target.checked ? "visible" : "none");
+});
+document.getElementById("toggle-grid-highlight").addEventListener("change", (e) => {
+  map.setLayoutProperty("municipios-grid-highlight", "visibility", e.target.checked ? "visible" : "none");
+});
+
+document.getElementById("basemap-toggle").addEventListener("click", (e) => {
+  const btn = e.target.closest("button");
+  if (!btn) return;
+  document.querySelectorAll("#basemap-toggle button").forEach((b) => b.classList.toggle("active", b === btn));
+  const showSat = btn.dataset.basemap === "satellite";
+  map.setLayoutProperty("osm-base", "visibility", showSat ? "none" : "visible");
+  map.setLayoutProperty("satellite-base", "visibility", showSat ? "visible" : "none");
 });
 
 // Panel colapsable en movil: el boton solo es visible bajo el media query
