@@ -1,0 +1,22 @@
+# Datos fuente y derivados intermedios — no van al repo publico.
+# Los geojson de data/web/ son exports intermedios ya tileados en
+# data/tiles/*.pmtiles (lo unico que el mapa necesita en runtime);
+# data/raw|processed|derived contienen ademas datos catastrales que
+# la licencia de descarga no permite redistribuir (ver capstone_costa_del_sol.md).
+data/raw/
+data/processed/
+data/derived/
+data/web/
+data/*.pdf
+
+# Notas de trabajo internas (no parte del entregable publico)
+capstone_costa_del_sol.md
+
+# Jupyter / Python
+.ipynb_checkpoints/
+__pycache__/
+*.pyc
+
+# OS
+.DS_Store
+Thumbs.db

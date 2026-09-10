@@ -1,0 +1,582 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Costa del Sol — Riesgo de Inundación</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/maplibre-gl@3.6.2/dist/maplibre-gl.css">
+<script src="https://cdn.jsdelivr.net/npm/maplibre-gl@3.6.2/dist/maplibre-gl.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/pmtiles@3.0.7/dist/pmtiles.js"></script>
+<style>
+  :root {
+    color-scheme: light;
+    --surface-1:      #fcfcfb;
+    --page-plane:     #f9f9f7;
+    --text-primary:   #0b0b0b;
+    --text-secondary: #52514e;
+    --text-muted:     #898781;
+    --border-hairline: rgba(11,11,11,0.10);
+    --blue-1: #9ec5f4;
+    --blue-2: #5598e7;
+    --blue-3: #256abf;
+    --blue-4: #0d366b;
+    --neutral: #e1e0d9;
+    --diverging-below: #e34948;
+    --diverging-mid: #898781;
+    --diverging-above: #2a78d6;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; height: 100%; font-family: system-ui, -apple-system, "Segoe UI", sans-serif; color: var(--text-primary); }
+  #map { position: absolute; inset: 0; }
+
+  #panel {
+    position: absolute;
+    top: 12px;
+    left: 12px;
+    width: 300px;
+    max-height: calc(100% - 24px);
+    overflow-y: auto;
+    background: var(--surface-1);
+    border: 1px solid var(--border-hairline);
+    border-radius: 10px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.12);
+    padding: 14px 16px;
+    font-size: 13px;
+    line-height: 1.4;
+  }
+  #panel-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 8px;
+  }
+  #panel h1 {
+    font-size: 15px;
+    margin: 0 0 2px;
+    font-weight: 700;
+  }
+  #panel .subtitle {
+    color: var(--text-secondary);
+    font-size: 12px;
+    margin: 0 0 12px;
+  }
+  #panel-toggle {
+    flex-shrink: 0;
+    border: 1px solid var(--border-hairline);
+    background: var(--page-plane);
+    border-radius: 6px;
+    width: 26px;
+    height: 26px;
+    font-size: 14px;
+    line-height: 1;
+    cursor: pointer;
+    color: var(--text-secondary);
+    display: none;
+  }
+  #panel.collapsed .control-group,
+  #panel.collapsed hr.sep,
+  #panel.collapsed .subtitle {
+    display: none;
+  }
+  #panel.collapsed {
+    max-height: none;
+  }
+  .control-group { margin-bottom: 12px; }
+  .control-label {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    color: var(--text-muted);
+    margin-bottom: 6px;
+    display: block;
+  }
+  .seg {
+    display: flex;
+    border: 1px solid var(--border-hairline);
+    border-radius: 6px;
+    overflow: hidden;
+  }
+  .seg button {
+    flex: 1;
+    border: none;
+    background: var(--page-plane);
+    color: var(--text-secondary);
+    font-size: 12px;
+    padding: 6px 4px;
+    cursor: pointer;
+    font-family: inherit;
+  }
+  .seg button.active {
+    background: var(--blue-3);
+    color: #fff;
+    font-weight: 600;
+  }
+  select#periodo {
+    width: 100%;
+    padding: 6px 8px;
+    border: 1px solid var(--border-hairline);
+    border-radius: 6px;
+    font-size: 12px;
+    font-family: inherit;
+    background: var(--page-plane);
+    color: var(--text-primary);
+  }
+  .legend-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 4px;
+    font-size: 12px;
+  }
+  .swatch {
+    width: 14px;
+    height: 14px;
+    border-radius: 3px;
+    flex-shrink: 0;
+    border: 1px solid var(--border-hairline);
+  }
+  .legend-note {
+    font-size: 11px;
+    color: var(--text-muted);
+    margin-top: 6px;
+  }
+  .toggle-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    margin-bottom: 4px;
+  }
+  hr.sep {
+    border: none;
+    border-top: 1px solid var(--border-hairline);
+    margin: 12px 0;
+  }
+
+  #detail-legend {
+    position: absolute;
+    bottom: 28px;
+    left: 12px;
+    background: var(--surface-1);
+    border: 1px solid var(--border-hairline);
+    border-radius: 10px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.12);
+    padding: 10px 12px;
+    font-size: 12px;
+    max-width: 260px;
+  }
+  #detail-legend .title {
+    font-weight: 600;
+    font-size: 11px;
+    margin-bottom: 6px;
+  }
+
+  .maplibregl-popup-content {
+    font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+    font-size: 12.5px;
+    padding: 12px 14px;
+    max-width: min(280px, calc(100vw - 40px));
+  }
+
+  @media (max-width: 640px) {
+    #panel {
+      width: calc(100% - 24px);
+      max-height: 42vh;
+    }
+    #panel-toggle { display: block; }
+    #detail-legend {
+      max-width: calc(100% - 24px);
+      font-size: 11px;
+      padding: 8px 10px;
+    }
+    #detail-legend .title { font-size: 10.5px; }
+  }
+  .popup-title { font-weight: 700; font-size: 13.5px; margin-bottom: 6px; }
+  .popup-section { margin-top: 8px; }
+  .popup-section-title {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.02em;
+    color: var(--text-muted);
+    margin-bottom: 3px;
+  }
+  .popup-row { display: flex; justify-content: space-between; gap: 8px; }
+  .popup-row .k { color: var(--text-secondary); }
+  .popup-row .v { font-weight: 600; text-align: right; }
+  .popup-note { font-size: 10.5px; color: var(--text-muted); margin-top: 6px; }
+</style>
+</head>
+<body>
+
+<div id="map"></div>
+
+<div id="panel">
+  <div id="panel-header">
+    <div>
+      <h1>Costa del Sol — Riesgo de inundación</h1>
+      <p class="subtitle">Tarifa–Nerja + valle del Guadalhorce · 62 municipios</p>
+    </div>
+    <button id="panel-toggle" aria-label="Mostrar/ocultar panel">▾</button>
+  </div>
+
+  <div class="control-group">
+    <span class="control-label">Carril de exposición</span>
+    <div class="seg" id="carril-toggle">
+      <button data-carril="urbano" class="active">Urbano (€)</button>
+      <button data-carril="agricola">Agrícola (ha)</button>
+    </div>
+  </div>
+
+  <div class="control-group">
+    <span class="control-label">Periodo de retorno</span>
+    <select id="periodo">
+      <option value="t10">T10 (frecuente)</option>
+      <option value="t50">T50</option>
+      <option value="t100" selected>T100 (referencia)</option>
+      <option value="t500">T500 (extremo)</option>
+      <option value="ead">EAD anualizado</option>
+    </select>
+  </div>
+
+  <hr class="sep">
+
+  <div class="control-group">
+    <span class="control-label" id="legend-title">Leyenda</span>
+    <div id="legend"></div>
+    <div class="legend-note" id="legend-note"></div>
+  </div>
+
+  <hr class="sep">
+
+  <div class="control-group">
+    <span class="control-label">Capas</span>
+    <label class="toggle-row"><input type="checkbox" id="toggle-snczi" checked> Zona inundable SNCZI</label>
+    <label class="toggle-row"><input type="checkbox" id="toggle-cauces" checked> Cauces (zoom ≥ 12)</label>
+    <label class="toggle-row"><input type="checkbox" id="toggle-comarcas" checked> Límite de comarca</label>
+  </div>
+</div>
+
+<div id="detail-legend">
+  <div class="title">Zoom ≥ 13 — cota relativa al cauce, por edificio o píxel de cultivo individual (no es un agregado municipal)</div>
+  <div class="legend-row"><span class="swatch" style="background:var(--diverging-below)"></span> Por debajo del cauce (&lt; -1 m)</div>
+  <div class="legend-row"><span class="swatch" style="background:var(--diverging-mid)"></span> A nivel del cauce (-1 a +1 m)</div>
+  <div class="legend-row"><span class="swatch" style="background:var(--diverging-above)"></span> Por encima del cauce (&gt; +1 m)</div>
+</div>
+
+<script>
+// ---------------------------------------------------------------------------
+// Costa del Sol Flood Risk - MapLibre + PMTiles
+//
+// Todo el dato ya viene calculado (2_indicators.ipynb) y reproyectado/tileado
+// (3_web_export.ipynb + convert.sh) - este script SOLO decide que propiedad
+// colorea el choropleth en cada momento y como se presenta. Nada se recalcula
+// aqui.
+// ---------------------------------------------------------------------------
+
+const PMTILES_URL = "./data/tiles/costa_del_sol_flood_risk.pmtiles";
+
+const protocol = new pmtiles.Protocol();
+maplibregl.addProtocol("pmtiles", protocol.tile);
+
+// Cuantiles (25/50/75 sobre los municipios con exposicion > 0) precalculados
+// en 3_web_export.ipynb a partir de municipios.geojson - no se recalculan en
+// cliente. El 20% inferior de cada lista es en su mayoria 0 (sin dato de
+// EUR/m2 en el carril urbano - solo 12/62 municipios tienen esa cobertura -
+// o sin superficie inundada en el agricola), por eso el 0 va como clase
+// propia en vez de como el primer escalon del degradado.
+const BREAKS = {
+  eur_urbano_t10:    [143981649.57, 775920086.00, 2302535915.20],
+  eur_urbano_t50:    [692378028.38, 1410644039.50, 5662014323.90],
+  eur_urbano_t100:   [299416146.77, 2144356777.90, 5888622057.75],
+  eur_urbano_t500:   [385565286.70, 2806285270.60, 7534196960.05],
+  ead_eur_urbano:    [106919385.57, 456997444.46, 1498330830.07],
+  ha_agricola_t10:   [1.61, 7.59, 57.77],
+  ha_agricola_t50:   [3.28, 12.04, 80.25],
+  ha_agricola_t100:  [3.06, 13.35, 81.80],
+  ha_agricola_t500:  [4.29, 18.99, 99.96],
+  ead_ha_agricola:   [1.01, 4.30, 32.79],
+};
+
+const RAMP = ["#9ec5f4", "#5598e7", "#256abf", "#0d366b"]; // claro -> oscuro
+const NEUTRAL = "#e1e0d9";
+
+const state = { carril: "urbano", periodo: "t100" };
+
+function propName(carril, periodo) {
+  if (carril === "urbano") return periodo === "ead" ? "ead_eur_urbano" : `eur_urbano_${periodo}`;
+  return periodo === "ead" ? "ead_ha_agricola" : `ha_agricola_${periodo}`;
+}
+
+function fmtEur(v) {
+  if (v == null) return "sin dato";
+  if (v >= 1e9) return (v / 1e9).toFixed(2).replace(".", ",") + " mil M€";
+  if (v >= 1e6) return (v / 1e6).toFixed(1).replace(".", ",") + " M€";
+  return Math.round(v).toLocaleString("es-ES") + " €";
+}
+function fmtHa(v) {
+  if (v == null) return "sin dato";
+  return v.toLocaleString("es-ES", { maximumFractionDigits: 1 }) + " ha";
+}
+function fmtM(v) {
+  if (v == null || Number.isNaN(v)) return "sin dato";
+  return (v >= 0 ? "+" : "") + v.toFixed(2) + " m";
+}
+function fmtPct(v) {
+  if (v == null) return "sin dato";
+  return v.toFixed(1).replace(".", ",") + " %";
+}
+
+function fillColorExpression(prop, breaks) {
+  const [b1, b2, b3] = breaks;
+  return [
+    "step",
+    ["coalesce", ["get", prop], 0],
+    NEUTRAL,
+    0.001, RAMP[0],
+    b1, RAMP[1],
+    b2, RAMP[2],
+    b3, RAMP[3],
+  ];
+}
+
+function renderLegend() {
+  const prop = propName(state.carril, state.periodo);
+  const breaks = BREAKS[prop];
+  const fmt = state.carril === "urbano" ? fmtEur : fmtHa;
+  const zeroLabel = state.carril === "urbano" ? "Sin dato / sin exposición" : "Sin superficie inundada";
+
+  const legendTitle = document.getElementById("legend-title");
+  legendTitle.textContent = state.carril === "urbano"
+    ? "Valor construido en riesgo, por municipio"
+    : "Superficie agrícola en riesgo, por municipio";
+
+  const rows = [
+    [NEUTRAL, zeroLabel],
+    [RAMP[0], `≤ ${fmt(breaks[0])}`],
+    [RAMP[1], `${fmt(breaks[0])} – ${fmt(breaks[1])}`],
+    [RAMP[2], `${fmt(breaks[1])} – ${fmt(breaks[2])}`],
+    [RAMP[3], `> ${fmt(breaks[2])}`],
+  ];
+
+  const legend = document.getElementById("legend");
+  legend.innerHTML = rows
+    .map(([color, label]) => `<div class="legend-row"><span class="swatch" style="background:${color}"></span>${label}</div>`)
+    .join("");
+
+  const note = document.getElementById("legend-note");
+  note.textContent = state.carril === "urbano"
+    ? "Clases por cuantiles (25/50/75) sobre los 12 municipios con dato de €/m² disponible."
+    : "Clases por cuantiles (25/50/75) sobre los 34 municipios con superficie agrícola inundada.";
+}
+
+function updateChoropleth(map) {
+  const prop = propName(state.carril, state.periodo);
+  map.setPaintProperty("municipios-fill", "fill-color", fillColorExpression(prop, BREAKS[prop]));
+
+  const snczPeriodo = state.periodo === "ead" ? "t100" : state.periodo;
+  map.setFilter("snczi-fill", ["==", ["get", "periodo"], snczPeriodo]);
+  map.setFilter("snczi-outline", ["==", ["get", "periodo"], snczPeriodo]);
+
+  renderLegend();
+}
+
+// --- cota relativa al cauce (diverging, fijo, no depende del selector) ---
+const COTA_RELATIVA_COLOR = [
+  "step",
+  ["coalesce", ["get", "cota_relativa_m"], 0],
+  "#e34948",
+  -1, "#898781",
+  1, "#2a78d6",
+];
+
+function buildMunicipioPopupHTML(p) {
+  return `
+    <div class="popup-title">${p.Mun_Name} <span style="font-weight:400;color:var(--text-muted);font-size:11px;">(total municipio)</span></div>
+    <div class="popup-section">
+      <div class="popup-section-title">Carril urbano</div>
+      <div class="popup-row"><span class="k">T10</span><span class="v">${fmtEur(p.eur_urbano_t10)}</span></div>
+      <div class="popup-row"><span class="k">T50</span><span class="v">${fmtEur(p.eur_urbano_t50)}</span></div>
+      <div class="popup-row"><span class="k">T100</span><span class="v">${fmtEur(p.eur_urbano_t100)}</span></div>
+      <div class="popup-row"><span class="k">T500</span><span class="v">${fmtEur(p.eur_urbano_t500)}</span></div>
+      <div class="popup-row"><span class="k">EAD anualizado</span><span class="v">${fmtEur(p.ead_eur_urbano)}</span></div>
+      <div class="popup-row"><span class="k">Edificios inundados T100</span><span class="v">${p.n_edificios_inundados_t100 ?? "sin dato"} (${fmtPct(p.pct_edificios_inundados_t100)})</span></div>
+    </div>
+    <div class="popup-section">
+      <div class="popup-section-title">Carril agrícola</div>
+      <div class="popup-row"><span class="k">T10</span><span class="v">${fmtHa(p.ha_agricola_t10)}</span></div>
+      <div class="popup-row"><span class="k">T50</span><span class="v">${fmtHa(p.ha_agricola_t50)}</span></div>
+      <div class="popup-row"><span class="k">T100</span><span class="v">${fmtHa(p.ha_agricola_t100)}</span></div>
+      <div class="popup-row"><span class="k">T500</span><span class="v">${fmtHa(p.ha_agricola_t500)}</span></div>
+      <div class="popup-row"><span class="k">EAD anualizado</span><span class="v">${fmtHa(p.ead_ha_agricola)}</span></div>
+      <div class="popup-row"><span class="k">Cultivo dominante (T100)</span><span class="v">${p.cultivo_principal_t100 ?? "sin dato"}</span></div>
+    </div>
+    <div class="popup-section">
+      <div class="popup-section-title">Daño histórico (CNIH)</div>
+      <div class="popup-row"><span class="k">Eventos registrados</span><span class="v">${p.n_eventos ?? "sin dato"}</span></div>
+      <div class="popup-row"><span class="k">Indemnización total</span><span class="v">${fmtEur(p.indemnizacion_total_eur)}</span></div>
+    </div>
+    ${p.is_grid ? '<div class="popup-note">Este municipio tiene grid de detalle (zoom ≥ 13) - edificios y cultivos a nivel de punto.</div>' : ""}
+  `;
+}
+
+function buildEdificioPopupHTML(p) {
+  return `
+    <div class="popup-title">Edificio individual (T100)</div>
+    <div class="popup-row"><span class="k">Cota relativa al cauce</span><span class="v">${fmtM(p.cota_relativa_m)}</span></div>
+    <div class="popup-row"><span class="k">Cota edificio</span><span class="v">${p.cota_edificio_m?.toFixed(2) ?? "sin dato"} m</span></div>
+    <div class="popup-row"><span class="k">Cota cauce</span><span class="v">${p.cota_cauce_m?.toFixed(2) ?? "sin dato"} m</span></div>
+    <div class="popup-note">Distancia al cauce: usa la escala del mapa (abajo a la derecha) para medirla a ojo si la necesitas.</div>
+  `;
+}
+
+function buildAgricolaPopupHTML(p) {
+  return `
+    <div class="popup-title">Píxel de cultivo individual (T100)</div>
+    <div class="popup-row"><span class="k">Tipo de cultivo</span><span class="v">${p.cultivo ?? "sin dato"}</span></div>
+    <div class="popup-row"><span class="k">Cota relativa al cauce</span><span class="v">${fmtM(p.cota_relativa_m)}</span></div>
+    <div class="popup-note">Distancia al cauce: usa la escala del mapa (abajo a la derecha) para medirla a ojo si la necesitas.</div>
+  `;
+}
+
+const map = new maplibregl.Map({
+  container: "map",
+  center: [-4.82, 36.67],
+  zoom: 9,
+  minZoom: 7,
+  maxZoom: 18,
+  attributionControl: false, // se anade a mano mas abajo - si no, maplibre pone su propia
+                              // control por defecto ADEMAS de la nuestra y sale duplicada
+  style: {
+    version: 8,
+    sources: {
+      osm: {
+        type: "raster",
+        tiles: ["https://tile.openstreetmap.org/{z}/{x}/{y}.png"],
+        tileSize: 256,
+        attribution: "© OpenStreetMap contributors",
+      },
+      cds: {
+        type: "vector",
+        url: `pmtiles://${PMTILES_URL}`,
+      },
+    },
+    layers: [
+      { id: "background", type: "background", paint: { "background-color": "#f9f9f7" } },
+      { id: "osm-base", type: "raster", source: "osm", paint: { "raster-opacity": 0.55 } },
+
+      { id: "snczi-fill", type: "fill", source: "cds", "source-layer": "snczi_zonas",
+        minzoom: 0, maxzoom: 14,
+        paint: { "fill-color": "#6da7ec", "fill-opacity": 0.35 } },
+      { id: "snczi-outline", type: "line", source: "cds", "source-layer": "snczi_zonas",
+        minzoom: 0, maxzoom: 14,
+        paint: { "line-color": "#256abf", "line-width": 0.6, "line-opacity": 0.6 } },
+
+      { id: "municipios-fill", type: "fill", source: "cds", "source-layer": "municipios",
+        minzoom: 0, maxzoom: 14,
+        paint: { "fill-color": NEUTRAL, "fill-opacity": 0.75 } },
+      { id: "municipios-outline", type: "line", source: "cds", "source-layer": "municipios",
+        minzoom: 0, maxzoom: 14,
+        paint: { "line-color": "#52514e", "line-width": 0.5, "line-opacity": 0.5 } },
+
+      { id: "comarcas-line", type: "line", source: "cds", "source-layer": "limites_comarcas",
+        minzoom: 0, maxzoom: 14,
+        paint: { "line-color": "#0b0b0b", "line-width": 2.2, "line-opacity": 0.9 } },
+
+      { id: "cauces-fill", type: "fill", source: "cds", "source-layer": "hidrografia_cauces",
+        minzoom: 12, maxzoom: 14,
+        paint: { "fill-color": "#184f95", "fill-opacity": 0.55 } },
+
+      { id: "agricola-grid-circle", type: "circle", source: "cds", "source-layer": "agricola_grid_t100",
+        minzoom: 13, maxzoom: 16,
+        paint: {
+          "circle-radius": 2.5,
+          "circle-color": COTA_RELATIVA_COLOR,
+          "circle-opacity": 0.75,
+        } },
+
+      { id: "edificios-grid-circle", type: "circle", source: "cds", "source-layer": "edificios_grid_t100",
+        minzoom: 13, maxzoom: 16,
+        paint: {
+          "circle-radius": 4,
+          "circle-color": COTA_RELATIVA_COLOR,
+          "circle-stroke-color": "#fff",
+          "circle-stroke-width": 0.6,
+          "circle-opacity": 0.9,
+        } },
+    ],
+  },
+});
+
+map.addControl(new maplibregl.NavigationControl(), "top-right");
+// En las esquinas "bottom-*" maplibre apila los controles insertando cada uno nuevo
+// POR ENCIMA del anterior (al reves que en las de arriba) - por eso la escala se
+// anade despues de la atribucion, para que quede encima de ella, no debajo.
+map.addControl(new maplibregl.AttributionControl({
+  customAttribution: "Dirección General del Catastro · SNCZI (MITECO) · Copernicus CLC+ Backbone · IGN",
+}), "bottom-right");
+map.addControl(new maplibregl.ScaleControl({ maxWidth: 120, unit: "metric" }), "bottom-right");
+
+map.on("load", () => {
+  updateChoropleth(map);
+
+  map.on("click", "municipios-fill", (e) => {
+    const p = e.features[0].properties;
+    new maplibregl.Popup().setLngLat(e.lngLat).setHTML(buildMunicipioPopupHTML(p)).addTo(map);
+  });
+  map.on("click", "edificios-grid-circle", (e) => {
+    const p = e.features[0].properties;
+    new maplibregl.Popup().setLngLat(e.lngLat).setHTML(buildEdificioPopupHTML(p)).addTo(map);
+  });
+  map.on("click", "agricola-grid-circle", (e) => {
+    const p = e.features[0].properties;
+    new maplibregl.Popup().setLngLat(e.lngLat).setHTML(buildAgricolaPopupHTML(p)).addTo(map);
+  });
+  ["municipios-fill", "edificios-grid-circle", "agricola-grid-circle"].forEach((id) => {
+    map.on("mouseenter", id, () => (map.getCanvas().style.cursor = "pointer"));
+    map.on("mouseleave", id, () => (map.getCanvas().style.cursor = ""));
+  });
+});
+
+// --- controles ---
+document.getElementById("carril-toggle").addEventListener("click", (e) => {
+  const btn = e.target.closest("button");
+  if (!btn) return;
+  state.carril = btn.dataset.carril;
+  document.querySelectorAll("#carril-toggle button").forEach((b) => b.classList.toggle("active", b === btn));
+  updateChoropleth(map);
+});
+
+document.getElementById("periodo").addEventListener("change", (e) => {
+  state.periodo = e.target.value;
+  updateChoropleth(map);
+});
+
+document.getElementById("toggle-snczi").addEventListener("change", (e) => {
+  const v = e.target.checked ? "visible" : "none";
+  map.setLayoutProperty("snczi-fill", "visibility", v);
+  map.setLayoutProperty("snczi-outline", "visibility", v);
+});
+document.getElementById("toggle-cauces").addEventListener("change", (e) => {
+  map.setLayoutProperty("cauces-fill", "visibility", e.target.checked ? "visible" : "none");
+});
+document.getElementById("toggle-comarcas").addEventListener("change", (e) => {
+  map.setLayoutProperty("comarcas-line", "visibility", e.target.checked ? "visible" : "none");
+});
+
+// Panel colapsable en movil: el boton solo es visible bajo el media query
+// (max-width: 640px), pero el listener se registra siempre por si cambia
+// el tamano de ventana.
+const panelEl = document.getElementById("panel");
+const panelToggleBtn = document.getElementById("panel-toggle");
+panelToggleBtn.addEventListener("click", () => {
+  panelEl.classList.toggle("collapsed");
+  panelToggleBtn.textContent = panelEl.classList.contains("collapsed") ? "▸" : "▾";
+});
+// Arranca colapsado en pantallas estrechas para no tapar el mapa al cargar.
+if (window.innerWidth <= 640) {
+  panelEl.classList.add("collapsed");
+  panelToggleBtn.textContent = "▸";
+}
+</script>
+</body>
+</html>
