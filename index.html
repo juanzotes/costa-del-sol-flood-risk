@@ -193,6 +193,12 @@
       padding: 8px 10px;
     }
     #detail-legend .title { font-size: 10.5px; }
+    /* El control de zoom (+/-/brujula) de MapLibre, arriba a la derecha, se
+       solapa con el desplegable del panel en movil y molesta al clicar - solo
+       se oculta aqui (media query movil), en desktop se queda igual. Es el
+       unico control en "top-right" (NavigationControl), asi que ocultar el
+       contenedor de esa esquina no afecta a atribucion/escala (bottom-right). */
+    .maplibregl-ctrl-top-right { display: none; }
   }
   .popup-title { font-weight: 700; font-size: 13.5px; margin-bottom: 6px; }
   .popup-section { margin-top: 8px; }
