@@ -168,11 +168,34 @@
     font-size: 12px;
     max-width: 260px;
   }
+  #detail-legend-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 8px;
+  }
   #detail-legend .title {
     font-weight: 600;
     font-size: 11px;
     margin-bottom: 6px;
   }
+  #detail-legend-toggle {
+    flex-shrink: 0;
+    border: 1px solid var(--border-hairline);
+    background: var(--page-plane);
+    border-radius: 6px;
+    width: 22px;
+    height: 22px;
+    font-size: 12px;
+    line-height: 1;
+    cursor: pointer;
+    color: var(--text-secondary);
+    display: none;
+  }
+  /* Mismo patron que #panel.collapsed - se oculta todo menos la cabecera
+     (titulo + boton) cuando esta colapsada. */
+  #detail-legend.collapsed #detail-legend-body { display: none; }
+  #detail-legend.collapsed .title { margin-bottom: 0; }
 
   .maplibregl-popup-content {
     font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
@@ -193,6 +216,7 @@
       padding: 8px 10px;
     }
     #detail-legend .title { font-size: 10.5px; }
+    #detail-legend-toggle { display: block; }
     /* El control de zoom (+/-/brujula) de MapLibre, arriba a la derecha, se
        solapa con el desplegable del panel en movil y molesta al clicar - solo
        se oculta aqui (media query movil), en desktop se queda igual. Es el
@@ -275,11 +299,16 @@
 </div>
 
 <div id="detail-legend">
-  <div class="title">Zoom ≥ 12.5 — elevation relative to channel, per individual building or crop pixel (not a municipality aggregate)</div>
-  <div class="legend-row"><span class="swatch" style="background:var(--diverging-below)"></span> Below channel level (&lt; -1 m)</div>
-  <div class="legend-row"><span class="swatch" style="background:var(--diverging-mid)"></span> At channel level (-1 to +1 m)</div>
-  <div class="legend-row"><span class="swatch" style="background:var(--diverging-above)"></span> Above channel level (&gt; +1 m)</div>
-  <div class="legend-note">Only available in the 10 municipalities marked on the map with a dashed orange outline: Fuengirola, Málaga, Marbella, Rincón de la Victoria, Vélez-Málaga, Torremolinos, San Roque, Cártama, Nerja and Mijas — selection criteria explained in the README.</div>
+  <div id="detail-legend-header">
+    <div class="title">Zoom ≥ 12.5 — elevation relative to channel, per individual building or crop pixel (not a municipality aggregate)</div>
+    <button id="detail-legend-toggle" aria-label="Show/hide legend">▾</button>
+  </div>
+  <div id="detail-legend-body">
+    <div class="legend-row"><span class="swatch" style="background:var(--diverging-below)"></span> Below channel level (&lt; -1 m)</div>
+    <div class="legend-row"><span class="swatch" style="background:var(--diverging-mid)"></span> At channel level (-1 to +1 m)</div>
+    <div class="legend-row"><span class="swatch" style="background:var(--diverging-above)"></span> Above channel level (&gt; +1 m)</div>
+    <div class="legend-note">Only available in the 10 municipalities marked on the map with a dashed orange outline: Fuengirola, Málaga, Marbella, Rincón de la Victoria, Vélez-Málaga, Torremolinos, San Roque, Cártama, Nerja and Mijas — selection criteria explained in the README.</div>
+  </div>
 </div>
 
 <script>
@@ -666,6 +695,19 @@ panelToggleBtn.addEventListener("click", () => {
 if (window.innerWidth <= 640) {
   panelEl.classList.add("collapsed");
   panelToggleBtn.textContent = "▸";
+}
+
+// Misma logica de colapsable para la leyenda de detalle (zoom >= 12.5) - el
+// boton solo se ve en el mismo media query movil que el del panel.
+const detailLegendEl = document.getElementById("detail-legend");
+const detailLegendToggleBtn = document.getElementById("detail-legend-toggle");
+detailLegendToggleBtn.addEventListener("click", () => {
+  detailLegendEl.classList.toggle("collapsed");
+  detailLegendToggleBtn.textContent = detailLegendEl.classList.contains("collapsed") ? "▸" : "▾";
+});
+if (window.innerWidth <= 640) {
+  detailLegendEl.classList.add("collapsed");
+  detailLegendToggleBtn.textContent = "▸";
 }
 </script>
 </body>
